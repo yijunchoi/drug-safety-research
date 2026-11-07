@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Second Look: FDA drug safety research</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+        <style>
+            :root {
+                --bg: #f6f4ef;
+                --card: #ffffff;
+                --ink: #1d2725;
+                --muted: #66716e;
+                --line: #e2ddd3;
+                --accent: #0f6b5c;
+                --accent-soft: #e3f1ed;
+                --warn: #a15c07;
+                --warn-soft: #fdf3e2;
+                --lead: #6d4bc4;
+                --researcher: #2563a8;
+                --writer: #0f7a4a;
+                --checker: #b45309;
+            }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+                font-family: Inter, system-ui, sans-serif;
+                background: var(--bg);
+                color: var(--ink);
+                line-height: 1.55;
+            }
+            main { max-width: 860px; margin: 0 auto; padding: 2.5rem 1rem 6rem; }
+
+            /* --- Intro --- */
+            .eyebrow { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+            h1 { font-family: Fraunces, Georgia, serif; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.1; margin: 0.4rem 0 0.6rem; }
+            .lede { font-size: 1.05rem; color: var(--muted); max-width: 40rem; }
+            .about { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; margin: 1.75rem 0; }
+            .about div { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; font-size: 0.9rem; }
+            .about h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 0.35rem; }
+            .about ol { padding-left: 1.1rem; }
+            .team-card { grid-template-columns: 1fr; margin-top: -0.75rem; }
+            .team { line-height: 2; }
+            .team-x { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+
+            .chip { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; background: #eee; white-space: nowrap; }
+            .chip::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
+            .a-lead { color: var(--lead); background: #efeafb; }
+            .a-researcher { color: var(--researcher); background: #e6eff9; }
+            .a-writer { color: var(--writer); background: #e2f4ea; }
+            .a-checker { color: var(--checker); background: #fbefe0; }
+
+            /* --- Examples --- */
+            .examples { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+            .examples button {
+                background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+                padding: 0.45rem 0.9rem; font: inherit; font-size: 0.85rem; cursor: pointer; color: var(--ink); text-align: left;
+            }
+            .examples button:hover { border-color: var(--accent); color: var(--accent); }
+            .examples small { color: var(--muted); margin-left: 0.25rem; }
+
+            /* --- Conversation --- */
+            #thread { display: flex; flex-direction: column; gap: 1.25rem; }
+            .user-msg { align-self: flex-end; background: var(--accent); color: #fff; padding: 0.6rem 1rem; border-radius: 14px 14px 2px 14px; max-width: 80%; }
+            .answer { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1.25rem 1.4rem; }
+            .answer.clarify { border-left: 4px solid var(--lead); }
+            .report h3 { font-size: 1rem; margin: 1.1rem 0 0.4rem; }
+            .report p, .report ul, .report ol, .report table { margin-bottom: 0.7rem; }
+            .report ul, .report ol { padding-left: 1.25rem; }
+            .report a { color: var(--accent); font-size: 0.85em; }
+            .report table { border-collapse: collapse; font-size: 0.85rem; display: block; overflow-x: auto; }
+            .report th, .report td { border: 1px solid var(--line); padding: 0.3rem 0.6rem; text-align: left; }
+            .report h3:last-of-type { color: var(--warn); }
+            .report em { color: var(--muted); }
+
+            /* Live progress: a lane per agent */
+            .lanes { display: flex; flex-direction: column; gap: 0.45rem; font-size: 0.85rem; }
+            .lane { display: grid; grid-template-columns: 8.5rem 1fr; gap: 0.6rem; align-items: start; }
+            .lane .steps { color: var(--muted); }
+            .lane .steps code { background: #f1efe9; padding: 0 0.3rem; border-radius: 4px; font-size: 0.8rem; color: var(--ink); }
+            .lane.busy .chip { animation: pulse 1.2s infinite; }
+            @keyframes pulse { 50% { opacity: 0.45; } }
+            .status-line { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+
+            /* Show its work */
+            details { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: 0.75rem; }
+            summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+            .calls { list-style: none; margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; }
+            .calls li { font-size: 0.8rem; }
+            .calls details { margin: 0; border: none; padding: 0; }
+            .calls summary { font-weight: 400; color: var(--ink); }
+            .calls pre { background: #f6f5f1; border-radius: 8px; padding: 0.6rem; margin-top: 0.35rem; font-size: 0.72rem; white-space: pre-wrap; word-break: break-word; max-height: 18rem; overflow: auto; }
+            .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+            .ghost { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.8rem; font: inherit; font-size: 0.8rem; cursor: pointer; color: var(--ink); }
+            .ghost:hover { border-color: var(--accent); color: var(--accent); }
+            .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
+            .compare > div { border: 1px dashed var(--line); border-radius: 10px; padding: 0.8rem; font-size: 0.85rem; max-height: 28rem; overflow: auto; }
+            .compare h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.4rem; }
+            @media (max-width: 640px) { .compare { grid-template-columns: 1fr; } .lane { grid-template-columns: 1fr; } }
+            .error { color: #b91c1c; }
+
+            /* --- Composer --- */
+            form#ask { position: sticky; bottom: 1rem; margin-top: 1.5rem; display: flex; gap: 0.5rem; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0.5rem; box-shadow: 0 6px 24px rgba(0,0,0,0.06); }
+            #message { flex: 1; border: none; outline: none; font: inherit; padding: 0.5rem 0.6rem; background: none; min-width: 0; }
+            #send { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 0 1.1rem; font: inherit; font-weight: 600; cursor: pointer; }
+            #send:disabled { opacity: 0.4; }
+            .footnote { font-size: 0.75rem; color: var(--muted); margin-top: 2rem; }
+
+            /* The starter's context panel, hidden until asked for */
+            body:not(.show-context) { margin-right: 0 !important; }
+            body:not(.show-context) #context-panel { display: none; }
+            #toggle-context { position: fixed; top: 0.75rem; right: 0.75rem; z-index: 5; background: var(--card); }
+            @media (max-width: 900px) { #toggle-context, #context-panel { display: none !important; } }
+        </style>
+    </head>
+    <body>
+        <button id="toggle-context" class="ghost" type="button">Show agent contexts</button>
+        <main>
+            <p class="eyebrow">Drug safety research agent</p>
+            <h1>Second Look</h1>
+            <p class="lede">What does the FDA's own data say about your medication? Ask a question and a small team of AI agents digs through millions of FDA side-effect reports, official drug labels and recall notices, then writes you a short report where every number links to its source.</p>
+
+            <section class="about">
+                <div>
+                    <h2>What it explores</h2>
+                    <p>Three public FDA databases through <a href="https://open.fda.gov">openFDA</a>: side-effect reports (FAERS, 20M+ reports since 2004), drug labels and their warnings, and drug recalls. Medicare Part D counts how many patients take each drug, so reports become rates. NIH RxNorm turns brand names into ingredients.</p>
+                </div>
+                <div>
+                    <h2>Who it's for</h2>
+                    <p>Patients and caregivers who heard something about a drug (on the news, TikTok, a forum) and want to see what the FDA's data actually shows, and what it can't show.</p>
+                </div>
+                <div>
+                    <h2>How to use it</h2>
+                    <ol>
+                        <li>Name a drug and what you want to know.</li>
+                        <li>If your question is broad, it asks you to narrow it.</li>
+                        <li>Watch the agents work, then read the cited report. Answers take 1-3 minutes.</li>
+                    </ol>
+                </div>
+            </section>
+
+            <div class="about team-card">
+                <div>
+                    <h2>The team</h2>
+                    <p class="team">
+                        <span class="chip a-lead">Lead</span> plans and asks for clarification ·
+                        <span class="chip a-researcher">Researchers</span> query openFDA in parallel ·
+                        <span class="chip a-writer">Writer</span> writes the cited report ·
+                        <span class="chip a-checker">Fact-checker</span> checks every number before you see it
+                    </p>
+                </div>
+            </div>
+
+            <div class="examples" id="examples">
+                <button data-q="Since 2020, have reports of pancreatitis for semaglutide (Ozempic, Wegovy) grown faster than the number of people taking it, and is pancreatitis on its label?">Ozempic pancreatitis: more reports, or more users?</button>
+                <button data-q="Compare semaglutide, tirzepatide and liraglutide: what share of each drug's FDA reports mention suicidal thoughts?">Suicidal thoughts: 3 weight-loss drugs compared</button>
+                <button data-q="Has metformin been recalled, and why?">Metformin recalls and why</button>
+                <button data-q="Is Ozempic safe?">Is Ozempic safe? <small>(vague: it will ask)</small></button>
+                <button data-q="How much does Wegovy cost without insurance?">Wegovy price <small>(the data can't say)</small></button>
+            </div>
+
+            <div id="thread"></div>
+
+            <form id="ask">
+                <input id="message" placeholder="e.g. What side effects are reported most for Adderall since 2022?" autocomplete="off" />
+                <button id="send" type="submit">Ask</button>
+            </form>
+
+            <p class="footnote">Not medical advice. FDA side-effect reports are unverified and don't prove a drug caused anything; talk to your doctor or pharmacist before changing any medication. Built for IEOR 4570 with Gemini, the OpenAI Agents SDK and openFDA.</p>
+        </main>
+
+        <script src="/context-panel.js"></script>
+        <script>
+            const $ = (id) => document.getElementById(id);
+            let sessionId = null;
+            let source = null;
+
+            const agentClass = (name) =>
+                name.startsWith("Lead") ? "a-lead" : name.startsWith("Researcher") ? "a-researcher" : name.startsWith("Writer") ? "a-writer" : "a-checker";
+
+            function el(tag, cls, text) {
+                const node = document.createElement(tag);
+                if (cls) node.className = cls;
+                if (text !== undefined) node.textContent = text;
+                return node;
+            }
+
+            function markdown(text) {
+                if (window.marked && window.DOMPurify) {
+                    const html = DOMPurify.sanitize(marked.parse(text));
+                    const box = el("div", "report");
+                    box.innerHTML = html;
+                    box.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
+                    return box;
+                }
+                const box = el("div", "report");
+                box.style.whiteSpace = "pre-wrap";
+                box.textContent = text;
+                return box;
+            }
+
+            function chip(agent) {
+                return el("span", "chip " + agentClass(agent), agent);
+            }
+
+            // --- Live progress: one lane per agent ---
+            function progressCard() {
+                const card = el("div", "answer");
+                const status = el("p", "status-line", "Starting…");
+                const lanes = el("div", "lanes");
+                card.append(status, lanes);
+                const byAgent = {};
+                const started = Date.now();
+                const timer = setInterval(() => {
+                    status.textContent = `Working… ${Math.round((Date.now() - started) / 1000)} s`;
+                }, 1000);
+                function lane(agent) {
+                    if (!byAgent[agent]) {
+                        const row = el("div", "lane busy");
+                        const steps = el("div", "steps");
+                        row.append(chip(agent), steps);
+                        lanes.append(row);
+                        byAgent[agent] = { row, steps };
+                    }
+                    return byAgent[agent];
+                }
+                function step(agent, node) {
+                    const { steps } = lane(agent);
+                    if (steps.childNodes.length) steps.append(" → ");
+                    steps.append(node);
+                }
+                return {
+                    card,
+                    onEvent(event) {
+                        if (event.type === "activity") {
+                            if (event.text === "started") lane(event.agent);
+                            else if (event.text.startsWith("finished")) lane(event.agent).row.classList.remove("busy");
+                            else if (!event.text.startsWith("called")) step(event.agent, document.createTextNode(event.text));
+                        } else if (event.type === "tool_start") {
+                            const code = el("code", "", event.name);
+                            const arg = event.args && (event.args.task || event.args.drug || event.args.name || (event.args.drugs || []).join(", "));
+                            step(event.agent, code);
+                            if (arg) code.title = arg;
+                            if (event.name === "research" && event.args.task) code.textContent = "research: " + event.args.task.slice(0, 70) + (event.args.task.length > 70 ? "…" : "");
+                        }
+                    },
+                    stop() {
+                        clearInterval(timer);
+                    },
+                    elapsed: () => Math.round((Date.now() - started) / 1000),
+                };
+            }
+
+            // --- The finished answer, with its work shown ---
+            function answerCard(question, done, seconds) {
+                const card = el("div", "answer");
+                const toolCalls = done.tool_calls || [];
+                if (!toolCalls.length) card.classList.add("clarify");
+                if (!toolCalls.length) card.append(chip("Lead"), el("div", "", " "));
+                card.append(markdown(done.response));
+
+                if (toolCalls.length) {
+                    const researchers = new Set(toolCalls.map((c) => c.agent).filter((a) => a.startsWith("Researcher")));
+                    const work = el("details");
+                    work.append(el("summary", "", `How I found this: ${toolCalls.length} tool calls by ${researchers.size} researchers in ${seconds} s`));
+                    const list = el("ul", "calls");
+                    toolCalls.forEach((call) => {
+                        const item = el("li");
+                        const d = el("details");
+                        const s = el("summary");
+                        s.append(chip(call.agent), " ", el("code", "", call.name), " " + JSON.stringify(call.args));
+                        let result = call.result || "";
+                        try { result = JSON.stringify(JSON.parse(result), null, 2); } catch (e) {}
+                        d.append(s, el("pre", "", result));
+                        item.append(d);
+                        list.append(item);
+                    });
+                    work.append(list);
+                    card.append(work);
+                }
+
+                const actions = el("div", "actions");
+                const compareBtn = el("button", "ghost", "Compare with plain Gemini (no tools, no data)");
+                compareBtn.type = "button";
+                compareBtn.onclick = async () => {
+                    compareBtn.disabled = true;
+                    compareBtn.textContent = "Asking plain Gemini…";
+                    const res = await fetch("/baseline", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: question }),
+                    }).then((r) => r.json()).catch((e) => ({ response: "Request failed: " + e }));
+                    const grid = el("div", "compare");
+                    const left = el("div");
+                    left.append(el("h4", "", "Plain Gemini, no tools"), markdown(res.response));
+                    const right = el("div");
+                    right.append(el("h4", "", "This agent, from FDA data"), markdown(done.response));
+                    grid.append(left, right);
+                    card.append(grid);
+                    compareBtn.remove();
+                };
+                if (toolCalls.length) actions.append(compareBtn);
+                card.append(actions);
+                return card;
+            }
+
+            function ask(question) {
+                if (!question.trim()) return;
+                if (source) source.close();
+                $("thread").append(el("div", "user-msg", question));
+                const progress = progressCard();
+                $("thread").append(progress.card);
+                progress.card.scrollIntoView({ behavior: "smooth", block: "start" });
+                $("send").disabled = true;
+                $("message").value = "";
+
+                const params = new URLSearchParams({ message: question });
+                if (sessionId) params.set("session_id", sessionId);
+                source = new EventSource("/chat/stream?" + params);
+                source.onmessage = (msg) => {
+                    const event = JSON.parse(msg.data);
+                    if (event.type === "start") {
+                        sessionId = event.session_id;
+                    } else if (event.type === "context") {
+                        if (document.body.classList.contains("show-context")) showContext(sessionId);
+                    } else if (event.type === "done") {
+                        progress.stop();
+                        progress.card.replaceWith(answerCard(question, event, progress.elapsed()));
+                        $("send").disabled = false;
+                        source.close();
+                    } else {
+                        progress.onEvent(event);
+                    }
+                };
+                source.onerror = () => {
+                    progress.stop();
+                    progress.card.append(el("p", "error", "Lost the connection to the server. Please try again."));
+                    $("send").disabled = false;
+                    source.close();
+                };
+            }
+
+            $("ask").addEventListener("submit", (e) => {
+                e.preventDefault();
+                ask($("message").value);
+            });
+            $("examples").addEventListener("click", (e) => {
+                const button = e.target.closest("button");
+                if (button) ask(button.dataset.q);
+            });
+            $("toggle-context").addEventListener("click", () => {
+                const on = document.body.classList.toggle("show-context");
+                $("toggle-context").textContent = on ? "Hide agent contexts" : "Show agent contexts";
+                if (on && sessionId) {
+                    resetContext();
+                    showContext(sessionId);
+                }
+            });
+        </script>
+    </body>
+</html>
