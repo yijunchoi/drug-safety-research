@@ -203,6 +203,26 @@ def faers_compare_drugs(drugs: list[str], reaction: str) -> str:
 
 # --- Researcher tools: labels and recalls ---
 
+# Recall notices are free text. These buckets make "why was it recalled?" countable.
+RECALL_REASONS = [
+    ("NDMA or other nitrosamine impurity", ("ndma", "nitrosamine", "ndea", "nitroso")),
+    ("Other impurity or contamination", ("impurit", "contamina", "microbial", "benzene", "bacteria")),
+    ("Foreign material or wrong pill in the bottle", ("foreign", "particulate", "mix-up", "mixup", "wrong tablet", "found in")),
+    ("Failed dissolution or potency test", ("dissolution", "subpotent", "superpotent", "assay", "potency", "out of specification", "oos")),
+    ("Labeling or packaging error", ("label", "packag", "mislabel", "carton")),
+    ("Storage temperature problem", ("temperature",)),
+    ("Sterility or manufacturing practice problem", ("steril", "cgmp", "good manufacturing")),
+]
+
+
+def _recall_reason(text: str) -> str:
+    lowered = text.lower()
+    for bucket, words in RECALL_REASONS:
+        if any(w in lowered for w in words):
+            return bucket
+    return "Other"
+
+
 
 @function_tool
 def label_warnings(drug: str) -> str:
@@ -233,8 +253,8 @@ def label_warnings(drug: str) -> str:
         "warnings": openfda.section(label, "warnings_and_cautions") or openfda.section(label, "warnings"),
         "adverse_reactions": openfda.section(label, "adverse_reactions"),
         "note": "openFDA serves the current label, not its history. A label's date is when this version took effect.",
+        # DailyMed shows the same label as a readable page, so cite it rather than the raw API JSON.
         "source": f"https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid={set_id}" if set_id else found["source"],
-        "api_source": found["source"],
     })
 
 
@@ -266,7 +286,12 @@ def drug_recalls(drug: str, start_year: int | None = None) -> str:
     return json.dumps({
         "drug": drug,
         "total_recalls": total,
+        "recalls_summarized": len(rows),
         "by_class": dict(Counter(r.get("classification", "?") for r in rows)),
+        "by_year": dict(sorted(Counter((r.get("recall_initiation_date") or "????")[:4] for r in rows).items())),
+        # The newest 10 alone can hide the main story (e.g. the 2020-2021 NDMA wave), so count every reason.
+        "by_reason": dict(Counter(_recall_reason(r.get("reason_for_recall") or "") for r in rows).most_common()),
+        "newest_recalls": "the 10 most recent are listed below",
         "recalls": [
             {
                 "recall_number": r.get("recall_number"),

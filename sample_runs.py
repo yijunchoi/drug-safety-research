@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 
 import medicare
 import openfda
+from tools import _recall_reason
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -62,11 +63,16 @@ def expected_compare() -> str:
 def expected_recalls() -> str:
     rows, total, url = openfda.recalls("metformin", start_year=2019)
     reasons: dict[str, int] = {}
+    years: dict[str, int] = {}
     for r in rows:
-        key = (r.get("reason_for_recall") or "")[:90]
+        key = _recall_reason(r.get("reason_for_recall") or "")
         reasons[key] = reasons.get(key, 0) + 1
-    top = "; ".join(f"{n}x \"{k}\"" for k, n in sorted(reasons.items(), key=lambda kv: -kv[1])[:3])
-    return f"{total} recall records since 2019. Most common reasons: {top}.\n\nSource: `/drug/enforcement.json` ({url})"
+        year = (r.get("recall_initiation_date") or "????")[:4]
+        years[year] = years.get(year, 0) + 1
+    top = "; ".join(f"{k}: {n}" for k, n in sorted(reasons.items(), key=lambda kv: -kv[1]))
+    by_year = ", ".join(f"{y}: {n}" for y, n in sorted(years.items()))
+    return (f"{total} recall records since 2019. By reason: {top}. By year started: {by_year}."
+            f"\n\nSource: `/drug/enforcement.json` ({url})")
 
 
 EXPECTED = [expected_pancreatitis, expected_compare, expected_recalls]
