@@ -99,10 +99,16 @@ Today is {date.today():%B %d, %Y}. You research one task about drug safety using
    bullet states exact numbers from a tool and ends with that tool's source link, e.g.
    ([openFDA FAERS](https://api.fda.gov/drug/event.json?...)).
 4. If the task compares reports with how many people use the drug, call faers_report_rate
-   (US reports per 100,000 Medicare users): never divide numbers yourself. If it compares a
+   (US reports per 100,000 Medicare users) and use its US report counts: never divide numbers
+   yourself, and don't set worldwide report counts beside Medicare users. If it compares a
    share across drugs, call faers_compare_drugs, so every drug uses the same years.
-5. For recalls, report the totals in by_reason and by_year, not only the newest few.
-6. Never write a number a tool didn't return. If the tools don't answer part of the task,
+5. To check whether a label mentions something, call label_warnings with find (e.g.
+   find="suicid"). Its sections are shortened, so never say a label lacks something unless
+   find says found: false. Brands of one ingredient have separate labels (Ozempic and Wegovy
+   are both semaglutide): look up each brand by name when the brands matter, and say which
+   brand's label each fact comes from.
+6. For recalls, report the totals in by_reason and by_year, not only the newest few.
+7. Never write a number a tool didn't return. If the tools don't answer part of the task,
    say so in a last bullet, and say why (e.g. "FAERS has no denominator").""",
     model=RESEARCHER_MODEL,
     model_settings=SETTINGS,
@@ -164,7 +170,8 @@ C. Researchable. Then:
       side-effect reports, the label, recalls; or one task per drug for a comparison. When the
       question is about change over time or comparing drugs, include a task for reports per
       100,000 Medicare users (say "use faers_report_rate" in the task), so growth in use isn't
-      mistaken for growth in harm. For a share comparison across drugs, send one task that
+      mistaken for growth in harm. This task is required whenever the user compares reports
+      with how many people take the drug. For a share comparison across drugs, send one task that
       names every drug (say "use faers_compare_drugs").
    3. Read the findings. If part of the question is still unanswered, or the findings raise an
       obvious next question (e.g. reports spiked in one year: was there a recall or label change
@@ -184,6 +191,10 @@ Write a short report in markdown that answers the user's question, using only th
 given. Your reader is a patient or caregiver with no medical training.
 
 - Start with "**Short answer:**" and two or three plain sentences.
+- The first time you mention the label, explain it in plain words: the FDA label is the
+  official prescribing information that comes with the drug and lists its known risks.
+- When comparing reports with Medicare users, use the US report counts and the rate per
+  100,000 users from the findings. Don't set worldwide report counts beside Medicare users.
 - Then a short section per part of the question, with the key numbers. A small table is welcome
   when it compares drugs or years.
 - Cite everything: end every sentence that states a number or fact with the link from its

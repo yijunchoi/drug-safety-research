@@ -116,8 +116,16 @@ def latest_label(drug: str) -> dict | None:
             continue
         labels = sorted(data.get("results", []), key=lambda l: l.get("effective_time", ""), reverse=True)
         if labels:
-            return {"label": labels[0], "versions_found": len(labels), "source": url}
+            # One ingredient can have several labels (Ozempic and Wegovy are both semaglutide),
+            # and their warnings differ, so say which brands there are.
+            brands = sorted({b for l in labels for b in l.get("openfda", {}).get("brand_name", [])})
+            return {"label": labels[0], "versions_found": len(labels), "brands": brands, "source": url}
     return None
+
+
+def full_text(label: dict, name: str) -> str:
+    value = label.get(name) or ""
+    return " ".join(value) if isinstance(value, list) else str(value)
 
 
 def section(label: dict, name: str) -> str | None:

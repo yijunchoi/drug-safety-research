@@ -225,13 +225,16 @@ def _recall_reason(text: str) -> str:
 
 
 @function_tool
-def label_warnings(drug: str) -> str:
+def label_warnings(drug: str, find: str | None = None) -> str:
     """The FDA-approved label for a drug: its boxed warning (FDA's strongest), warnings, and
     listed adverse reactions, plus the label's date. Use it to see whether a reported side effect
     is already on the label.
 
     Args:
-        drug: Active ingredient or brand name, e.g. 'semaglutide'.
+        drug: Active ingredient or brand name, e.g. 'semaglutide' or 'Wegovy'. Brands that share
+            an ingredient can have different labels, so use the brand name when it matters.
+        find: A word to look for in the whole label, e.g. 'pancreatitis' or 'suicid'. The sections
+            returned are shortened, so use this before saying a label does or doesn't mention something.
     """
     try:
         found = openfda.latest_label(drug)
@@ -244,18 +247,47 @@ def label_warnings(drug: str) -> str:
     meta = label.get("openfda", {})
     effective = label.get("effective_time", "")
     set_id = label.get("set_id")
-    return json.dumps({
+    out = {
         "drug": drug,
         "brand_names": meta.get("brand_name", [])[:5],
+        "other_brands_with_this_ingredient": [b for b in found["brands"] if b not in meta.get("brand_name", [])][:8],
         "manufacturer": meta.get("manufacturer_name", [])[:3],
         "label_date": f"{effective[:4]}-{effective[4:6]}-{effective[6:8]}" if len(effective) >= 8 else effective,
         "boxed_warning": openfda.section(label, "boxed_warning") or "None: this label has no boxed warning.",
         "warnings": openfda.section(label, "warnings_and_cautions") or openfda.section(label, "warnings"),
         "adverse_reactions": openfda.section(label, "adverse_reactions"),
-        "note": "openFDA serves the current label, not its history. A label's date is when this version took effect.",
+        "note": "Sections are cut at 2,500 characters: use find to search the whole label. openFDA serves "
+                "the current label, not its history. Other brands of the same ingredient have their own labels.",
         # DailyMed shows the same label as a readable page, so cite it rather than the raw API JSON.
         "source": f"https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid={set_id}" if set_id else found["source"],
-    })
+    }
+    if find:
+        out["find"] = _find_in_label(label, find)
+    return json.dumps(out)
+
+
+LABEL_SECTIONS = {
+    "boxed_warning": "Boxed warning",
+    "warnings_and_cautions": "Warnings and precautions",
+    "warnings": "Warnings",
+    "contraindications": "Contraindications",
+    "adverse_reactions": "Adverse reactions",
+    "postmarketing_experience": "Postmarketing experience",
+    "spl_medguide": "Medication guide",
+    "information_for_patients": "Patient information",
+}
+
+
+def _find_in_label(label: dict, term: str) -> dict:
+    """Where a word appears in the full label, with a short passage around the first hit per section."""
+    t = term.lower().strip()
+    hits = []
+    for key, title in LABEL_SECTIONS.items():
+        text = openfda.full_text(label, key)
+        i = text.lower().find(t)
+        if i >= 0:
+            hits.append({"section": title, "passage": "..." + text[max(0, i - 200):i + 300] + "..."})
+    return {"term": term, "found": bool(hits), "sections": hits}
 
 
 @function_tool

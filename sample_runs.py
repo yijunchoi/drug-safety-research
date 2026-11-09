@@ -23,7 +23,7 @@ load_dotenv(Path(__file__).parent / ".env")
 
 QUERIES = [
     "Since 2020, have FDA reports of pancreatitis for semaglutide (Ozempic, Wegovy) grown faster than the number "
-    "of Medicare patients taking it, and is pancreatitis mentioned on its label?",
+    "of Medicare patients taking it, and does its official FDA label warn about pancreatitis?",
     "Compare semaglutide, tirzepatide and liraglutide: what share of each drug's FDA adverse event reports "
     "mention suicidal ideation?",
     "Has metformin been recalled since 2019, and why?",
