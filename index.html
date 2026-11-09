@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Second Look: FDA drug safety research</title>
+        <title>Drug Safety Lens</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -109,7 +109,7 @@
             #send:disabled { opacity: 0.4; }
             .footnote { font-size: 0.75rem; color: var(--muted); margin-top: 2rem; }
 
-            /* The starter's context panel, hidden until asked for */
+            /* Agent context panel, hidden until asked for */
             body:not(.show-context) { margin-right: 0 !important; }
             body:not(.show-context) #context-panel { display: none; }
             #toggle-context { position: fixed; top: 0.75rem; right: 0.75rem; z-index: 5; background: var(--card); }
@@ -119,8 +119,8 @@
     <body>
         <button id="toggle-context" class="ghost" type="button">Show agent contexts</button>
         <main>
-            <p class="eyebrow">Drug safety research agent</p>
-            <h1>Second Look</h1>
+            <p class="eyebrow">Drug safety research from public FDA and Medicare data</p>
+            <h1>Drug Safety Lens</h1>
             <p class="lede">What does the FDA's own data say about your medication? Ask a question and a small team of AI agents digs through millions of FDA side-effect reports, official drug labels and recall notices, then writes you a short report where every number links to its source.</p>
 
             <section class="about">
@@ -158,8 +158,8 @@
                 <button data-q="Since 2020, have reports of pancreatitis for semaglutide (Ozempic, Wegovy) grown faster than the number of people taking it, and is pancreatitis on its label?">Ozempic pancreatitis: more reports, or more users?</button>
                 <button data-q="Compare semaglutide, tirzepatide and liraglutide: what share of each drug's FDA reports mention suicidal thoughts?">Suicidal thoughts: 3 weight-loss drugs compared</button>
                 <button data-q="Has metformin been recalled, and why?">Metformin recalls and why</button>
-                <button data-q="Is Ozempic safe?">Is Ozempic safe? <small>(vague: it will ask)</small></button>
-                <button data-q="How much does Wegovy cost without insurance?">Wegovy price <small>(the data can't say)</small></button>
+                <button data-q="Is Ozempic safe?">Is Ozempic safe?</button>
+                <button data-q="How much does Wegovy cost without insurance?">Wegovy price without insurance</button>
             </div>
 
             <div id="thread"></div>
@@ -169,7 +169,7 @@
                 <button id="send" type="submit">Ask</button>
             </form>
 
-            <p class="footnote">Not medical advice. FDA side-effect reports are unverified and don't prove a drug caused anything; talk to your doctor or pharmacist before changing any medication. Built for IEOR 4570 with Gemini, the OpenAI Agents SDK and openFDA.</p>
+            <p class="footnote">Not medical advice. FDA side-effect reports are unverified and don't prove a drug caused anything; talk to your doctor or pharmacist before changing any medication. Data: openFDA (FAERS, labels, recalls), CMS Medicare Part D, NIH RxNorm.</p>
         </main>
 
         <script src="/context-panel.js"></script>
