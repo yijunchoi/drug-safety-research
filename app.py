@@ -149,11 +149,41 @@ async def research(ctx: RunContextWrapper[Research], task: str) -> str:
     # What researcher.as_tool() does: run the researcher in a fresh context and return its answer.
     # Written out so each run gets a numbered copy, and its own column in the context panel.
     run.researchers += 1
-    agent = researcher.clone(name=f"Researcher {run.researchers}")
-    result = await Runner.run(agent, f"Task: {task}", context=run, hooks=run.hooks,
-                              max_turns=RESEARCHER_MAX_TURNS)
+    number = run.researchers
+    agent = researcher.clone(name=f"Researcher {number}")
+    # Start a round's researchers a second apart, so they don't all hit the model at once.
+    await asyncio.sleep((number - 1) % 4)
+    try:
+        result = await run_agent(agent, f"Task: {task}", context=run, hooks=run.hooks,
+                                 max_turns=RESEARCHER_MAX_TURNS)
+    except Exception as e:
+        if not _is_busy(e):
+            raise
+        # One researcher failing shouldn't sink the whole answer: tell the Lead, who can retry or move on.
+        return f"Researcher {number} couldn't finish: the AI service was busy. Nothing was found for this task."
     run.findings.append(f"Task: {task}\n\n{result.final_output}")
     return str(result.final_output)
+
+
+# --- Retries: Vertex AI sometimes answers "busy" (429) when several agents call it at once ---
+
+BUSY = ("RateLimitError", "ServiceUnavailableError", "InternalServerError", "APIConnectionError", "Timeout")
+
+
+def _is_busy(e: Exception) -> bool:
+    return any(name in type(e).__name__ for name in BUSY)
+
+
+async def run_agent(agent: Agent, prompt: str, **kwargs):
+    """Runner.run, tried again after a pause if the model is only busy. LiteLLM retries fast
+    on its own; this waits longer, which is what a 'resource exhausted' answer needs."""
+    for wait in (5, 15, None):
+        try:
+            return await Runner.run(agent, prompt, **kwargs)
+        except Exception as e:
+            if wait is None or not _is_busy(e):
+                raise
+            await asyncio.sleep(wait)
 
 
 # --- The lead: clarifies, plans, fans out to researchers, and checks for gaps ---
@@ -266,7 +296,7 @@ async def answer(message: str, history: list[dict], hooks: Recorder) -> str:
 
     # 1. Research: clarify or plan, fan out, check for gaps
     prompt = f"Conversation so far:\n{_transcript(history)}\n\nNew message from the user: {message}"
-    planned = await Runner.run(lead, prompt, context=run, hooks=hooks, max_turns=LEAD_MAX_TURNS)
+    planned = await run_agent(lead, prompt, context=run, hooks=hooks, max_turns=LEAD_MAX_TURNS)
     verdict = str(planned.final_output).strip()
     for prefix in ("CLARIFY:", "OUT_OF_SCOPE:"):
         if verdict.upper().startswith(prefix):
@@ -277,15 +307,15 @@ async def answer(message: str, history: list[dict], hooks: Recorder) -> str:
     # 2. Write: the Writer sees only the question and the findings, not the Lead's reasoning
     findings = "\n\n---\n\n".join(run.findings)
     question = f"Conversation so far:\n{_transcript(history)}\n\nQuestion: {message}"
-    draft = await Runner.run(writer, f"{question}\n\nFindings:\n\n{findings}", hooks=hooks)
+    draft = await run_agent(writer, f"{question}\n\nFindings:\n\n{findings}", hooks=hooks)
     report = str(draft.final_output)
 
     # 3. Check: one review, and at most one rewrite
-    review = await Runner.run(checker, f"Findings:\n\n{findings}\n\n---\n\nReport:\n\n{report}", hooks=hooks)
+    review = await run_agent(checker, f"Findings:\n\n{findings}\n\n---\n\nReport:\n\n{report}", hooks=hooks)
     problems = str(review.final_output).strip()
     if problems.upper().rstrip(".") != "OK" and time.monotonic() - run.started < REWRITE_SECONDS:
         hooks.activity("Fact-checker", "sent the report back to the Writer")
-        fixed = await Runner.run(
+        fixed = await run_agent(
             writer,
             f"{question}\n\nFindings:\n\n{findings}\n\nYour draft:\n\n{report}\n\n"
             f"A fact-checker found these problems. Fix them and return the whole report:\n{problems}",
@@ -327,7 +357,11 @@ async def _answer_in_session(message: str, session: Session, emit) -> tuple[str,
         response = await answer(message, session.history, hooks)
     except Exception as e:
         # Auth, quota, a model that won't stop: show it in the chat, not as a 500.
-        response = f"Something went wrong: {type(e).__name__}: {str(e)[:300]}"
+        if _is_busy(e):
+            response = ("The AI service is busy right now and couldn't finish this answer. "
+                        "Please ask again in a minute.")
+        else:
+            response = f"Something went wrong: {type(e).__name__}: {str(e)[:300]}"
     session.history += [{"role": "user", "content": message}, {"role": "assistant", "content": response}]
     return response, hooks.tool_calls
 
