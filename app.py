@@ -36,11 +36,11 @@ SETTINGS = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90,
 FAST = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90, "num_retries": 2,
                                  "reasoning_effort": "low", "drop_params": True})
 
-# Caps that keep one answer well under the graders' 5 minutes. Prompts ask for restraint; code enforces it.
+# Caps that keep one answer to a few minutes. Prompts ask for restraint; code enforces it.
 MAX_RESEARCHERS = 8  # in all, across every round
 MAX_ROUNDS = 3  # the first fan-out plus at most two follow-ups for gaps
 LEAD_MAX_TURNS = 12
-# Time budget per answer, in seconds. Graders wait up to 5 minutes.
+# Time budget per answer, in seconds, so nobody waits more than about 5 minutes.
 RESEARCH_SECONDS = 150  # no new researchers after this
 REWRITE_SECONDS = 210  # skip the Fact-checker's rewrite after this
 RESEARCHER_MAX_TURNS = 10
@@ -106,7 +106,8 @@ Today is {date.today():%B %d, %Y}. You research one task about drug safety using
    faers_top_reactions before using them in other tools.
 3. Reply with the facts that answer your task and nothing else, at most 10 bullets. Every
    bullet states exact numbers from a tool and ends with that tool's source link, e.g.
-   ([openFDA FAERS](https://api.fda.gov/drug/event.json?...)).
+   ([openFDA FAERS](https://api.fda.gov/drug/event.json?...)). When a tool also gives
+   users_source, cite it too as ([CMS](url)).
 4. If the task compares reports with how many people use the drug, call faers_report_rate
    (US reports per 100,000 Medicare users) and use its US report counts: never divide numbers
    yourself, and don't set worldwide report counts beside Medicare users. If it compares a
@@ -211,6 +212,9 @@ given. Your reader is a patient or caregiver with no medical training.
   when it compares drugs or years.
 - Cite everything: end every sentence that states a number or fact with the link from its
   finding, as a short markdown link like ([FAERS](url)), ([label](url)) or ([recalls](url)).
+  Numbers from Medicare user counts cite ([CMS](url)); a rate per 100,000 users cites both.
+- In a table, put no links in the cells: cite every source the table uses once, in the
+  sentence just above it.
 - Always end with a "### What this data can't tell you" section with only the limits of the data
   this report actually used. Side-effect reports: they don't prove the drug caused the problem,
   FAERS has no count of users so there is no risk rate, the Medicare rate is only a rough index
@@ -234,7 +238,8 @@ You check a drug-safety report against the research findings it was written from
 
 List every problem you find, one per line:
 - a number that doesn't appear in the findings, or differs from them
-- a factual sentence with no source link, or a link that isn't in the findings
+- a factual sentence with no source link, or a link that isn't in the findings (a table's
+  numbers are cited by the links in the sentence just above it)
 - a claim that a drug causes something, or a "risk" or "rate", when the data are only reports
 - a missing "What this data can't tell you" section
 
@@ -354,7 +359,7 @@ def index():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Project 1's /chat shape: one JSON answer once the research is done."""
+    """One JSON answer once the research is done, with every tool call behind it."""
     session_id, session = _session(request.session_id)
     response, tool_calls = await _answer_in_session(request.message, session, lambda event: None)
     return ChatResponse(response=response, session_id=session_id, tool_calls=tool_calls)
