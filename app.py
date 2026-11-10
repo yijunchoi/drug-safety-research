@@ -104,7 +104,8 @@ Today is {date.today():%B %d, %Y}. You research one task about drug safety using
    share across drugs, call faers_compare_drugs, so every drug uses the same years.
 5. To check whether a label mentions something, call label_warnings with find (e.g.
    find="suicid"). Its sections are shortened, so never say a label lacks something unless
-   find says found: false. Brands of one ingredient have separate labels (Ozempic and Wegovy
+   find says found: false. Report what find returned: found, whether it is in the
+   warnings, and which sections it names. Brands of one ingredient have separate labels (Ozempic and Wegovy
    are both semaglutide): look up each brand by name when the brands matter, and say which
    brand's label each fact comes from.
 6. For recalls, report the totals in by_reason and by_year, not only the newest few.

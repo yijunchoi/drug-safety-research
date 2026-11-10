@@ -279,15 +279,23 @@ LABEL_SECTIONS = {
 
 
 def _find_in_label(label: dict, term: str) -> dict:
-    """Where a word appears in the full label, with a short passage around the first hit per section."""
+    """Where a word appears in the full label, with a short passage around the first hit per section.
+    Every text section is searched, not only the warnings, because labels file things in many places."""
     t = term.lower().strip()
+    skip = {"openfda", "set_id", "id", "version", "effective_time"}
+    keys = list(LABEL_SECTIONS) + sorted(k for k in label if k not in LABEL_SECTIONS and k not in skip
+                                         and not k.endswith("_table"))
     hits = []
-    for key, title in LABEL_SECTIONS.items():
+    for key in keys:
         text = openfda.full_text(label, key)
         i = text.lower().find(t)
         if i >= 0:
+            title = LABEL_SECTIONS.get(key, key.replace("_", " ").capitalize())
             hits.append({"section": title, "passage": "..." + text[max(0, i - 200):i + 300] + "..."})
-    return {"term": term, "found": bool(hits), "sections": hits}
+    warning_titles = {LABEL_SECTIONS[k] for k in ("boxed_warning", "warnings_and_cautions", "warnings")}
+    return {"term": term, "found": bool(hits),
+            "in_boxed_warning_or_warnings": any(h["section"] in warning_titles for h in hits),
+            "sections": hits[:6]}
 
 
 @function_tool
