@@ -1,4 +1,5 @@
 import asyncio
+import time
 import json
 import uuid
 from dataclasses import dataclass, field
@@ -30,11 +31,18 @@ MODEL = LitellmModel(model=MODEL_NAME, api_key="unused")
 RESEARCHER_MODEL = LitellmModel(model="vertex_ai/gemini-3.5-flash-lite", api_key="unused")
 # A stalled model call would hang the page: give up after 90 s, and retry twice.
 SETTINGS = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90, "num_retries": 2})
+# Researchers, the Writer and the Fact-checker follow clear rules, so they need little thinking.
+# Less thinking makes each call several times faster. drop_params skips it if a model can't take it.
+FAST = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90, "num_retries": 2,
+                                 "reasoning_effort": "low", "drop_params": True})
 
 # Caps that keep one answer well under the graders' 5 minutes. Prompts ask for restraint; code enforces it.
 MAX_RESEARCHERS = 8  # in all, across every round
 MAX_ROUNDS = 3  # the first fan-out plus at most two follow-ups for gaps
 LEAD_MAX_TURNS = 12
+# Time budget per answer, in seconds. Graders wait up to 5 minutes.
+RESEARCH_SECONDS = 150  # no new researchers after this
+REWRITE_SECONDS = 210  # skip the Fact-checker's rewrite after this
 RESEARCHER_MAX_TURNS = 10
 
 
@@ -47,6 +55,7 @@ class Research:
     lead_turns: int = 0  # how many times the Lead has called the model
     rounds: set = field(default_factory=set)  # the Lead turns that sent researchers out
     findings: list[str] = field(default_factory=list)  # what each researcher reported, for the Writer
+    started: float = field(default_factory=time.monotonic)
 
 
 class Recorder(PanelHooks):
@@ -112,7 +121,7 @@ Today is {date.today():%B %d, %Y}. You research one task about drug safety using
 7. Never write a number a tool didn't return. If the tools don't answer part of the task,
    say so in a last bullet, and say why (e.g. "FAERS has no denominator").""",
     model=RESEARCHER_MODEL,
-    model_settings=SETTINGS,
+    model_settings=FAST,
     tools=RESEARCHER_TOOLS,
 )
 
@@ -130,6 +139,8 @@ async def research(ctx: RunContextWrapper[Research], task: str) -> str:
     run = ctx.context
     if run.researchers >= MAX_RESEARCHERS:
         return "No researchers left. Reply DONE."
+    if time.monotonic() - run.started > RESEARCH_SECONDS:
+        return "Time is up for research. Reply DONE."
     # Every research call in one Lead turn is the same round: they run in parallel.
     if run.lead_turns not in run.rounds and len(run.rounds) >= MAX_ROUNDS:
         return "The round limit is reached. Reply DONE."
@@ -211,7 +222,7 @@ given. Your reader is a patient or caregiver with no medical training.
 - Don't tell the reader whether to take a drug. End with: "_Not medical advice: talk to your
   doctor or pharmacist._" """,
     model=MODEL,
-    model_settings=SETTINGS,
+    model_settings=FAST,
 )
 
 # --- The fact-checker: reads the report against the findings before the user sees it ---
@@ -229,7 +240,7 @@ List every problem you find, one per line:
 
 If there are no problems, reply OK and nothing else.""",
     model=MODEL,
-    model_settings=SETTINGS,
+    model_settings=FAST,
 )
 
 
@@ -267,7 +278,7 @@ async def answer(message: str, history: list[dict], hooks: Recorder) -> str:
     # 3. Check: one review, and at most one rewrite
     review = await Runner.run(checker, f"Findings:\n\n{findings}\n\n---\n\nReport:\n\n{report}", hooks=hooks)
     problems = str(review.final_output).strip()
-    if problems.upper().rstrip(".") != "OK":
+    if problems.upper().rstrip(".") != "OK" and time.monotonic() - run.started < REWRITE_SECONDS:
         hooks.activity("Fact-checker", "sent the report back to the Writer")
         fixed = await Runner.run(
             writer,

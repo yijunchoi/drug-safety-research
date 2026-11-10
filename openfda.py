@@ -8,6 +8,7 @@ the agent can say "no reports found" instead of "the API failed".
 """
 
 import os
+import time
 from functools import lru_cache
 
 import httpx
@@ -35,13 +36,21 @@ def _get_cached(path: str, frozen_params: tuple) -> dict:
     key = os.environ.get("OPENFDA_API_KEY")
     if key:
         params["api_key"] = key
-    response = httpx.get(f"{OPENFDA}{path}", params=params, timeout=TIMEOUT)
-    if response.status_code == 404:
-        raise NoMatches(params.get("search", ""))
+    # openFDA sometimes fails for a moment (500, 503) or rate-limits (429): wait and try again.
+    for wait in (1, 3, 6, None):
+        response = httpx.get(f"{OPENFDA}{path}", params=params, timeout=TIMEOUT)
+        if response.status_code == 404:
+            raise NoMatches(params.get("search", ""))
+        if response.status_code < 400:
+            return response.json()
+        if response.status_code not in (429, 500, 502, 503, 504) or wait is None:
+            break
+        time.sleep(wait)
+    # The error names the public URL, never the one with the API key in it.
+    public = _public_url(path, {k: v for k, v in params.items() if k != "api_key"})
     if response.status_code == 429:
         raise RuntimeError("openFDA rate limit reached. Set OPENFDA_API_KEY for a higher limit.")
-    response.raise_for_status()
-    return response.json()
+    raise RuntimeError(f"openFDA returned {response.status_code} for {public}")
 
 
 def openfda_get(path: str, params: dict) -> tuple[dict, str]:
