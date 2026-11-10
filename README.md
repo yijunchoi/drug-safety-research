@@ -52,21 +52,21 @@ Each expected answer below is computed straight from the data with plain code (`
 - **Expected:** No. US pancreatitis reports went 143 → 126 → 120 → 150 → 225 (2020-2024) while Medicare users went 297,488 → 2,315,591, so reports per 100,000 Medicare users fell from 48.1 to 9.7. Yes, pancreatitis appears on the current semaglutide label.
 - **Source:** `/drug/event.json`, US reports counted by `receivedate` for `patient.reaction.reactionmeddrapt:"PANCREATITIS"`; `data/medicare_part_d_users.csv` for Medicare users per year; `/drug/label.json` for semaglutide (cited as its DailyMed page)
 - **This agent:** Matches. It answers "No", shows a year-by-year table of Medicare users, US reports and the rate (48.1, 22.2, 12.4, 8.6, 9.7), keeps the worldwide counts (164 → 393) in a separate section so they aren't set against Medicare users, and says yes on the label: acute pancreatitis is in Warnings and Precautions (5.2) of the Ozempic label and in its Medication Guide. 4 Researchers in parallel, 9 tool calls.
-- **Gemini, no tools, no system prompt:** Gets the label right, but has no report counts, so its "No" is a guess. Its Medicare numbers are attributed to KFF and don't match CMS: it says about 225,000 Ozempic users in 2020 and over 1.2 million by 2023 (CMS: 269,663 and 1,464,468). It also gives an unsourced "4 to 5 cases per 1,000 patient-years".
+- **Same model (Gemini) with no tools and no system prompt:** Gets the label right, but has no report counts, so its "No" is a guess. Its Medicare numbers are attributed to KFF and don't match CMS: it says about 225,000 Ozempic users in 2020 and over 1.2 million by 2023 (CMS: 269,663 and 1,464,468). It also gives an unsourced "4 to 5 cases per 1,000 patient-years".
 
 ### 2. "Compare semaglutide, tirzepatide and liraglutide: what share of each drug's FDA adverse event reports mention suicidal ideation?"
 
 - **Expected:** semaglutide 520 of 78,023 reports (0.67%), liraglutide 169 of 51,303 (0.33%), tirzepatide 509 of 181,068 (0.28%). Semaglutide's share is about twice the other two.
 - **Source:** `/drug/event.json`, report totals per drug with and without `patient.reaction.reactionmeddrapt:"SUICIDAL IDEATION"`, all years
 - **This agent:** Matches: 520/78,023 (0.7%), 509/181,068 (0.3%), 169/51,303 (0.3%), from one `faers_compare_drugs` call so every drug uses the same years. The Lead also sent Researchers to the labels and recalls, then a second round to check the brand labels one by one (Wegovy, Saxenda, Mounjaro). It reports that the Wegovy label on file (April 2024) has the suicidal behavior and ideation warning, while the current Saxenda and Zepbound labels say it was removed in February 2026. 4 Researchers, 17 tool calls.
-- **Gemini, no tools, no system prompt:** Gives ranges instead of counts, and all three are too low: semaglutide "0.2% to 0.4%" (actual 0.67%), liraglutide "0.1% to 0.3%" (actual 0.33%), tirzepatide "0.1% to 0.2%" (actual 0.28%). It misses that semaglutide's share is about twice the others, and it describes Saxenda's suicidal-ideation warning as current, not knowing the label changed in 2026.
+- **Same model (Gemini) with no tools and no system prompt:** Gives ranges instead of counts, and all three are too low: semaglutide "0.2% to 0.4%" (actual 0.67%), liraglutide "0.1% to 0.3%" (actual 0.33%), tirzepatide "0.1% to 0.2%" (actual 0.28%). It misses that semaglutide's share is about twice the others, and it describes Saxenda's suicidal-ideation warning as current, not knowing the label changed in 2026.
 
 ### 3. "Has metformin been recalled since 2019, and why?"
 
 - **Expected:** Yes, 65 recalls started since 2019. By year: 2020: 44, 2021: 15, then 1-2 a year. By reason: NDMA or other nitrosamine impurity 47, storage temperature 6, foreign material or wrong pill 5, sterility or manufacturing practice 4, failed dissolution or potency 2, other impurity 1.
 - **Source:** `/drug/enforcement.json` for metformin (generic name, brand name or product description), `recall_initiation_date` from 2019
 - **This agent:** Matches every count: 65 recalls (62 Class II, 3 Class III), the year table and all six reasons. It also checked whether the current label mentions NDMA (it doesn't) and listed the firms behind the 10 newest recalls. 3 Researchers, 9 tool calls.
-- **Gemini, no tools, no system prompt:** Knows the NDMA story and names manufacturers, but gives no counts ("multiple recalls") and misses the 18 recalls that weren't about NDMA, such as storage temperature and wrong pills in the bottle.
+- **Same model (Gemini) with no tools and no system prompt:** Knows the NDMA story and names manufacturers, but gives no counts ("multiple recalls") and misses the 18 recalls that weren't about NDMA, such as storage temperature and wrong pills in the bottle.
 
 ### Two more to try
 
