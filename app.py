@@ -120,7 +120,8 @@ Today is {date.today():%B %d, %Y}. You research one task about drug safety using
    are both semaglutide): look up each brand by name when the brands matter, and say which
    brand's label each fact comes from.
 6. For recalls, report the totals in by_reason and by_year, not only the newest few.
-7. Never write a number a tool didn't return. If the tools don't answer part of the task,
+7. Use only the years your task names. If it names none, leave the year arguments empty.
+8. Never write a number a tool didn't return. If the tools don't answer part of the task,
    say so in a last bullet, and say why (e.g. "FAERS has no denominator").""",
     model=RESEARCHER_MODEL,
     model_settings=FAST,
@@ -239,8 +240,9 @@ Write a short report in markdown that answers the user's question, using only th
 given. Your reader is a patient or caregiver with no medical training.
 
 - Start with "**Short answer:**" and two or three plain sentences.
-- The first time you mention the label, explain it in plain words: the FDA label is the
-  official prescribing information that comes with the drug and lists its known risks.
+- If the report uses the FDA label, explain it the first time it comes up, in plain words: the
+  label is the official prescribing information that comes with the drug and lists its known
+  risks. If the findings don't include the label, don't mention it.
 - When comparing reports with Medicare users, use the US report counts and the rate per
   100,000 users from the findings. Don't set worldwide report counts beside Medicare users.
 - Then a short section per part of the question, with the key numbers. A small table is welcome
@@ -248,6 +250,8 @@ given. Your reader is a patient or caregiver with no medical training.
 - Cite everything: end every sentence that states a number or fact with the link from its
   finding, as a short markdown link like ([FAERS](url)), ([label](url)) or ([recalls](url)).
   Numbers from Medicare user counts cite ([CMS](url)); a rate per 100,000 users cites both.
+  A sentence with numbers from two queries (e.g. two drugs) cites both. Copy every link exactly
+  as the findings give it: never decode or shorten it. The short answer is cited too.
 - In a table, put no links in the cells: cite every source the table uses once, in the
   sentence just above it.
 - Always end with a "### What this data can't tell you" section with only the limits of the data
@@ -258,7 +262,8 @@ given. Your reader is a patient or caregiver with no medical training.
   Add any part of the question the findings didn't answer. These are general limits: don't put
   source links on them.
 - Never add a number or fact that isn't in the findings. Say "reports", never "cases" or "risk".
-- Don't tell the reader whether to take a drug. End with: "_Not medical advice: talk to your
+- Don't tell the reader what to do (take, stop, call). If the label gives an instruction, report
+  it as what the label says, with its link. End with: "_Not medical advice: talk to your
   doctor or pharmacist._" """,
     model=MODEL,
     model_settings=FAST,
@@ -285,6 +290,24 @@ If there are no problems, reply OK and nothing else.""",
 
 
 # --- One answer: Lead -> Researchers -> Writer -> Fact-checker ---
+
+
+def _uncited(report: str) -> list[str]:
+    """Lines of the report that state something but carry no source link. Checked in code, because
+    a model reviewer misses some. The limits section and the closing line need no links."""
+    body = report.split("can't tell you")[0]
+    found, intro_cited = [], False
+    for line in body.splitlines():
+        text = line.strip()
+        is_item = text.startswith(("* ", "- ", "|"))  # list items and table rows: cited by the line above
+        if text and not is_item:
+            intro_cited = "](http" in line
+        text = text.strip("*-| ").strip()
+        if (not text or text.startswith(("#", "---")) or "](http" in line or len(text) < 40
+                or (is_item and intro_cited)):
+            continue
+        found.append(f"- no source link on: {text[:120]}")
+    return found
 
 
 def _transcript(history: list[dict]) -> str:
@@ -318,6 +341,9 @@ async def answer(message: str, history: list[dict], hooks: Recorder) -> str:
     # 3. Check: one review, and at most one rewrite
     review = await run_agent(checker, f"Findings:\n\n{findings}\n\n---\n\nReport:\n\n{report}", hooks=hooks)
     problems = str(review.final_output).strip()
+    missing = _uncited(report)
+    if missing:
+        problems = ("" if problems.upper().rstrip(".") == "OK" else problems + "\n") + "\n".join(missing)
     if problems.upper().rstrip(".") != "OK" and time.monotonic() - run.started < REWRITE_SECONDS:
         hooks.activity("Fact-checker", "sent the report back to the Writer")
         fixed = await run_agent(
