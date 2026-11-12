@@ -1,10 +1,13 @@
 import asyncio
-import time
+import difflib
 import json
+import re
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from urllib.parse import unquote_plus
 
 import litellm
 import uvicorn
@@ -183,9 +186,15 @@ async def run_agent(agent: Agent, prompt: str, **kwargs):
         try:
             return await Runner.run(agent, prompt, **kwargs)
         except Exception as e:
-            if wait is None or not _is_busy(e):
+            if not _is_busy(e):
                 raise
+            if wait is None:
+                break
             await asyncio.sleep(wait)
+    # Still busy: Flash-Lite has its own capacity, so a last try there usually gets through.
+    if agent.model is RESEARCHER_MODEL:
+        raise RuntimeError("RateLimitError: the model stayed busy")
+    return await Runner.run(agent.clone(model=RESEARCHER_MODEL), prompt, **kwargs)
 
 
 # --- The lead: clarifies, plans, fans out to researchers, and checks for gaps ---
@@ -292,6 +301,28 @@ If there are no problems, reply OK and nothing else.""",
 # --- One answer: Lead -> Researchers -> Writer -> Fact-checker ---
 
 
+LINK = re.compile(r"\]\((https?://[^)\s]+(?:\([^)\s]*\)[^)\s]*)*)\)")
+
+
+def _fix_links(report: str, tool_calls: list[dict]) -> str:
+    """Make every link in the report one a tool really returned. Models sometimes retype a long query
+    URL and change it; swap such a link for the closest real one of the same kind, or drop it."""
+    real = sorted({u.rstrip(".,") for c in tool_calls for u in re.findall(r"https?://[^\s\"'\\]+", str(c["result"]))})
+
+    def fix(match: re.Match) -> str:
+        url = match.group(1)
+        if url in real:
+            return match.group(0)
+        same_kind = [u for u in real if u.split("?")[0] == url.split("?")[0]]
+        best = difflib.get_close_matches(unquote_plus(url), [unquote_plus(u) for u in same_kind], n=1, cutoff=0.8)
+        if best:
+            return f"]({same_kind[[unquote_plus(u) for u in same_kind].index(best[0])]})"
+        return "](#no-source)"
+
+    report = LINK.sub(fix, report)
+    return re.sub(r"\s*\(\[[^\]]*\]\(#no-source\)\)", "", report)
+
+
 def _uncited(report: str) -> list[str]:
     """Lines of the report that state something but carry no source link. Checked in code, because
     a model reviewer misses some. The limits section and the closing line need no links."""
@@ -336,7 +367,7 @@ async def answer(message: str, history: list[dict], hooks: Recorder) -> str:
     findings = "\n\n---\n\n".join(run.findings)
     question = f"Conversation so far:\n{_transcript(history)}\n\nQuestion: {message}"
     draft = await run_agent(writer, f"{question}\n\nFindings:\n\n{findings}", hooks=hooks)
-    report = str(draft.final_output)
+    report = _fix_links(str(draft.final_output), hooks.tool_calls)
 
     # 3. Check: one review, and at most one rewrite
     review = await run_agent(checker, f"Findings:\n\n{findings}\n\n---\n\nReport:\n\n{report}", hooks=hooks)
@@ -352,7 +383,7 @@ async def answer(message: str, history: list[dict], hooks: Recorder) -> str:
             f"A fact-checker found these problems. Fix them and return the whole report:\n{problems}",
             hooks=hooks,
         )
-        report = str(fixed.final_output)
+        report = _fix_links(str(fixed.final_output), hooks.tool_calls)
     return report
 
 
