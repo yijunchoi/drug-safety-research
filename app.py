@@ -112,6 +112,7 @@ Today is {date.today():%B %d, %Y}. You research one task about drug safety using
    (US reports per 100,000 Medicare users) and use its US report counts: never divide numbers
    yourself, and don't set worldwide report counts beside Medicare users. If it compares a
    share across drugs, call faers_compare_drugs, so every drug uses the same years.
+   If a year in faers_report_rate has a warning, give the warning with that year's rate.
 5. To check whether a label mentions something, call label_warnings with find (e.g.
    find="suicid"). Its sections are shortened, so never say a label lacks something unless
    find says found: false. Report what find returned: found, whether it is in the
@@ -207,9 +208,13 @@ B. Out of scope: FDA data can't answer it at all (prices, whether they personall
    it, dosing, how well a drug works). Reply "OUT_OF_SCOPE:" then say plainly what this data can't
    answer and suggest one related question it can.
 C. Researchable. Then:
-   1. Call resolve_drug_name for each drug the user names, to get its active ingredient.
-   2. Split the question into 2 to 4 independent tasks and call research once per task, all in
-      the same turn, so the researchers work in parallel. Usually one task per data source:
+   1. Call resolve_drug_name for each drug the user names, and use its search_names in every
+      task. For a combination drug, name each ingredient in the task.
+   2. Research what the question asks, not more: a question about reports doesn't need a
+      recalls task. For a broad question ("compare X and Y", an overview), cover reports, the
+      label and recalls. Split the question into 2 to 4 independent tasks and call research
+      once per task, all in the same turn, so the researchers work in parallel. Usually one
+      task per data source:
       side-effect reports, the label, recalls; or one task per drug for a comparison. When the
       question is about change over time or comparing drugs, include a task for reports per
       100,000 Medicare users (say "use faers_report_rate" in the task), so growth in use isn't

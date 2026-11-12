@@ -43,7 +43,8 @@ def _share(part: int, whole: int) -> str:
 @function_tool
 def resolve_drug_name(name: str) -> str:
     """Turn any drug name a user types (a brand like 'Ozempic', or a misspelling) into its active
-    ingredient and its other brand names, using NIH RxNorm. Use the ingredient for every openFDA search.
+    ingredient and its other brand names, using NIH RxNorm. Use search_names for every openFDA
+    search. A combination drug (e.g. Adderall) has several: research each one by name.
 
     Args:
         name: The drug name as the user wrote it.
@@ -407,6 +408,9 @@ def faers_report_rate(drug: str, reaction: str = "") -> str:
             "medicare_users": users,
             "reports_per_100k_users": round(100_000 * reports.get(year, 0) / users, 1) if users else None,
         })
+        # Few Medicare users (a new drug, or one Medicare barely covers) make the rate meaningless.
+        if users and users < 100_000:
+            years[-1]["warning"] = "Under 100,000 Medicare users this year: most reports likely come from people outside Medicare, so this rate overstates."
     return json.dumps({
         "drug": drug,
         "reaction": reaction or "all reactions",

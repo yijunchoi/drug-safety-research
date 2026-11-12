@@ -165,6 +165,22 @@ def recalls(drug: str, start_year=None) -> tuple[list[dict], int, str]:
 # --- RxNorm: brand name -> active ingredient ---
 
 
+SALTS = {"sulfate", "aspartate", "saccharate", "hydrochloride", "hcl", "sodium", "potassium", "calcium",
+         "maleate", "tartrate", "bitartrate", "citrate", "phosphate", "succinate", "fumarate", "mesylate",
+         "besylate", "acetate", "bromide", "chloride", "monohydrate", "dihydrate", "anhydrous", "hyclate"}
+
+
+def base_names(ingredients: list[str]) -> list[str]:
+    """Ingredient names without their salt, deduplicated: 'amphetamine aspartate' and 'amphetamine
+    sulfate' both become 'amphetamine'. openFDA matches the base name inside every salt's name."""
+    out: list[str] = []
+    for ingredient in ingredients:
+        base = " ".join(w for w in ingredient.lower().split() if w not in SALTS) or ingredient.lower()
+        if base not in out:
+            out.append(base)
+    return out
+
+
 @lru_cache(maxsize=256)
 def rxnorm_names(name: str) -> dict:
     """Map any drug name (brand, misspelling) to its active ingredient(s) and brand names."""
@@ -180,9 +196,11 @@ def rxnorm_names(name: str) -> dict:
     for group in related.json().get("relatedGroup", {}).get("conceptGroup", []):
         for concept in group.get("conceptProperties", []) or []:
             names.setdefault(group.get("tty"), []).append(concept["name"])
+    ingredients = names.get("IN", [])
     return {
         "rxcui": rxcui,
-        "ingredients": names.get("IN", []),
+        "ingredients": ingredients,
+        "search_names": base_names(ingredients),
         "brand_names": names.get("BN", [])[:15],
         "source": f"https://mor.nlm.nih.gov/RxNav/search?searchBy=RXCUI&searchTerm={rxcui}",
     }
