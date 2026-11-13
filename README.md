@@ -4,7 +4,7 @@ This is a deep research agent that investigates a medication's real-world safety
 
 **Live app:** <https://drug-safety-research-git-900827490817.europe-west1.run.app>
 
-Ask "Has metformin been recalled, and why?" and a Lead agent plans the research, sends Researchers to query openFDA in parallel, goes back for more when the findings leave a gap, and hands the findings to a Writer. A Fact-checker then compares the report against the findings before you see it. Every number in the answer links to the openFDA query it came from, and every answer ends with what the data can't tell you.
+Ask "Has metformin been recalled, and why?" and a Lead agent plans the research, sends Researchers to query openFDA in parallel, goes back for more when the findings leave a gap, and hands the findings to a Writer. A Fact-checker then compares the report against the findings before you see it. Every number in the answer links to the query or file it came from, and every answer ends with what the data can't tell you.
 
 ## Why this data
 
@@ -18,8 +18,8 @@ To get closer to a fair comparison, the agent joins FAERS with CMS Medicare Part
 
 | Agent | Job | Tools |
 | --- | --- | --- |
-| **Lead** | Asks for clarification if the question is vague, turns brand names into ingredients, splits the question into 2-4 tasks, sends a Researcher per task in one turn (parallel, fresh contexts), reads the findings and sends more Researchers for any gap (at most 3 rounds, 8 Researchers) | `resolve_drug_name`, `research` |
-| **Researcher** (x2-8) | Answers one task from openFDA and Medicare data and returns cited bullets | `faers_top_reactions`, `faers_trend`, `faers_reaction_detail`, `faers_compare_drugs`, `faers_report_rate`, `label_warnings`, `drug_recalls`, `medicare_users` |
+| **Lead** | Asks for clarification if the question is vague, turns brand names into ingredients, splits the question into 1-4 tasks, sends a Researcher per task in one turn (parallel, fresh contexts), reads the findings and sends more Researchers for any gap (at most 3 rounds, 8 Researchers) | `resolve_drug_name`, `research` |
+| **Researcher** (x1-8) | Answers one task from openFDA and Medicare data and returns cited bullets | `faers_top_reactions`, `faers_trend`, `faers_reaction_detail`, `faers_compare_drugs`, `faers_report_rate`, `label_warnings`, `drug_recalls`, `medicare_users` |
 | **Writer** | Writes the report from the findings alone, citing a source link on every fact, ending with "What this data can't tell you" | none |
 | **Fact-checker** | Checks every number and link in the report against the findings, flags causal language; the Writer fixes the report once if it finds problems | none |
 
@@ -52,7 +52,7 @@ Each expected answer below is computed straight from the data with plain code (`
 - **Expected:** No. US pancreatitis reports went 143 → 126 → 120 → 150 → 225 (2020-2024) while Medicare users went 297,488 → 2,315,591, so reports per 100,000 Medicare users fell from 48.1 to 9.7. Yes, pancreatitis appears on the current semaglutide label.
 - **Source:** `/drug/event.json`, US reports counted by `receivedate` for `patient.reaction.reactionmeddrapt:"PANCREATITIS"`; `data/medicare_part_d_users.csv` for Medicare users per year; `/drug/label.json` for semaglutide (cited as its DailyMed page)
 - **This agent:** Matches; it answers "No" and shows a year-by-year table of Medicare users, US reports and the rate (48.1, 22.2, 12.4, 8.6, 9.7), citing CMS for the users and FAERS for the reports. On the label it says yes: acute pancreatitis is in Warnings and Precautions (5.2) of the Ozempic label, in its adverse reactions and in its Medication Guide. 4 Researchers in parallel, 9 tool calls.
-- **Same model (Gemini) with no tools and no system prompt:** Gets the label right, but has no report counts, so its "No" is a guess. Its Medicare numbers are attributed to KFF and don't match CMS: "roughly 240,000" Ozempic users in 2020 and "well over 1 million" by 2023 (CMS: 269,663 and 1,464,468). It also gives an unsourced "1 to 2 cases per 1,000 patient-years".
+- **Same model (Gemini) with no tools and no system prompt:** Gets the label right, but has no report counts, so its "No" is a guess. Its Medicare numbers are attributed to KFF, not CMS, and its 2020 figure is off: "roughly 240,000" Ozempic users (CMS: 269,663). It also gives an unsourced "1 to 2 cases per 1,000 patient-years".
 
 ### 2. "Compare semaglutide, tirzepatide and liraglutide: what share of each drug's FDA adverse event reports mention suicidal ideation?"
 
@@ -65,13 +65,14 @@ Each expected answer below is computed straight from the data with plain code (`
 
 - **Expected:** Yes, 65 recalls started since 2019. By year: 2020: 44, 2021: 15, then 1-2 a year. By reason: NDMA or other nitrosamine impurity 47, storage temperature 6, foreign material or wrong pill 5, sterility or manufacturing practice 4, failed dissolution or potency 2, other impurity 1.
 - **Source:** `/drug/enforcement.json` for metformin (generic name, brand name or product description), `recall_initiation_date` from 2019
-- **This agent:** Matches every count: 65 recalls (62 Class II, 3 Class III), the year table and all six reasons. (1 Researcher, 3 tool calls.)
+- **This agent:** Matches every count: 65 recalls (62 Class II, 3 Class III), the year table and all six reasons. 1 Researcher, 3 tool calls.
 - **Same model (Gemini) with no tools and no system prompt:** Knows the NDMA story and names manufacturers, but gives no counts ("significant recalls") and misses the 18 recalls that weren't about NDMA, such as storage temperature and wrong pills in the bottle.
 
-### Two more to try
+### Three more to try
 
 - **"Is Ozempic safe?"** is vague; the Lead asks which concern you mean (a specific side effect, a time period, a comparison, or an overview) before any research.
 - **"How much does Wegovy cost without insurance?"** is something FDA data can't answer. The agent says so and suggests a question it can answer.
+- **"Compare Ozempic and Mounjaro."** is a broad question: the Lead sends Researchers across side-effect reports, labels and recalls for both drugs in parallel, and goes back for more if the first findings leave a gap.
 
 ## Running it locally
 
@@ -83,7 +84,7 @@ gcloud auth application-default login
 uv run app.py
 ```
 
-Then open http://localhost:8000. To regenerate SAMPLE_RUNS.md, run uv run sample_runs.py http://127.0.0.1:8000 while the app is running.
+Then open http://localhost:8000. To regenerate SAMPLE_RUNS.md, run `uv run sample_runs.py http://127.0.0.1:8000` while the app is running.
 
 ## Deployment
 
