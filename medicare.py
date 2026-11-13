@@ -1,4 +1,5 @@
-"""How many Medicare patients filled each drug, per year: the denominator FAERS doesn't have.
+"""
+How many Medicare patients filled each drug, per year. FAERS counts reports but not how many people take a drug, so these user counts let us compare report counts against usage.
 
 data/medicare_part_d_users.csv is trimmed from CMS's "Medicare Part D Spending by Drug" (data year
 2024, released 2026): one row per brand, the "Overall" row across manufacturers, with total

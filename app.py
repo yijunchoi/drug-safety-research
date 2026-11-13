@@ -21,29 +21,28 @@ from pydantic import BaseModel
 from context_panel import AgentContexts, PanelHooks, add_context_panel
 from tools import RESEARCHER_TOOLS, resolve_drug_name
 
-# OPENFDA_API_KEY comes from the .env file locally, and from Cloud Run's environment when deployed.
+# OPENFDA_API_KEY comes from the .env file locally, and from Cloud Run's environment when deployed
 load_dotenv(Path(__file__).parent / ".env")
 
-# Traces upload to OpenAI by default, which needs an OpenAI key. We're on Gemini.
 set_tracing_disabled(True)
 
-# LiteLLM routes the call to Gemini. api_key is unused: Vertex AI uses your gcloud credentials.
+# LiteLLM routes the call to Gemini
 MODEL_NAME = "vertex_ai/gemini-3.5-flash"
 MODEL = LitellmModel(model=MODEL_NAME, api_key="unused")
-# Researchers call tools and take notes: the cheaper model is enough.
+# Researchers call tools and take notes
 RESEARCHER_MODEL = LitellmModel(model="vertex_ai/gemini-3.5-flash-lite", api_key="unused")
-# A stalled model call would hang the page: give up after 90 s, and retry twice.
+# A stalled model call would hang the page: give up after 90 s, and retry twice
 SETTINGS = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90, "num_retries": 2})
-# Researchers, the Writer and the Fact-checker follow clear rules, so they need little thinking.
-# Less thinking makes each call several times faster. drop_params skips it if a model can't take it.
+# Researchers, the Writer and the Fact-checker follow clear rules
+
 FAST = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90, "num_retries": 2,
                                  "reasoning_effort": "low", "drop_params": True})
 
-# Caps that keep one answer to a few minutes. Prompts ask for restraint; code enforces it.
+# Caps that keep one answer to a few minutes
 MAX_RESEARCHERS = 8  # in all, across every round
 MAX_ROUNDS = 3  # the first fan-out plus at most two follow-ups for gaps
 LEAD_MAX_TURNS = 12
-# Time budget per answer, in seconds, so nobody waits more than about 5 minutes.
+# Time budget per answer, in seconds
 RESEARCH_SECONDS = 150  # no new researchers after this
 REWRITE_SECONDS = 210  # skip the Fact-checker's rewrite after this
 RESEARCHER_MAX_TURNS = 10
@@ -134,7 +133,8 @@ Today is {date.today():%B %d, %Y}. You research one task about drug safety using
 
 @function_tool
 async def research(ctx: RunContextWrapper[Research], task: str) -> str:
-    """Send a researcher to answer one task from openFDA (side-effect reports, label, recalls)
+    """
+    Send a researcher to answer one task from openFDA (side-effect reports, label, recalls)
     and Medicare Part D (how many patients use a drug).
     Returns its findings, each with the query it came from.
 
@@ -170,7 +170,7 @@ async def research(ctx: RunContextWrapper[Research], task: str) -> str:
     return str(result.final_output)
 
 
-# --- Retries: Vertex AI sometimes answers "busy" (429) when several agents call it at once ---
+# --- Retries: Vertex AI sometimes answers "busy" when several agents call it at once ---
 
 BUSY = ("RateLimitError", "ServiceUnavailableError", "InternalServerError", "APIConnectionError", "Timeout")
 
@@ -361,7 +361,7 @@ async def answer(message: str, history: list[dict], hooks: Recorder) -> str:
         if verdict.upper().startswith(prefix):
             return verdict[len(prefix):].strip()
     if not run.findings:
-        return verdict  # the Lead answered without research, e.g. a greeting
+        return verdict  # the Lead answered without research
 
     # 2. Write: the Writer sees only the question and the findings, not the Lead's reasoning
     findings = "\n\n---\n\n".join(run.findings)
@@ -483,7 +483,7 @@ async def chat_stream(message: str, session_id: str | None = None):
                 if event["type"] == "done":
                     break
         finally:
-            task.cancel()  # the page closed the stream: stop spending tokens
+            task.cancel()  # the page closed the stream
 
     return StreamingResponse(events(), media_type="text/event-stream")
 
