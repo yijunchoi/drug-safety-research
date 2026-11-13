@@ -1,7 +1,7 @@
-"""The tools the agents call. Every tool returns a JSON string with a `source` URL to cite.
+"""
+Every tool the agents can call. Each one returns JSON with a source link, so every number can be traced back to where it came from.
+If something goes wrong, a tool returns {“error”: ..., “hint”: ...} and that way the agent can read what happened and either tell the user or try a different search.
 
-When something goes wrong a tool returns {"error": ..., "hint": ...} instead of raising: the model
-can't see an exception, but it can read an error, tell the user, or try another search.
 """
 
 import json

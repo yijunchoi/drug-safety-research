@@ -1,7 +1,6 @@
-"""Small clients for the two public APIs the agent reads: openFDA and NIH RxNorm.
-
-Every function returns plain dicts that already carry a `source` URL, so the Researchers can cite
-exactly which query a number came from. The URLs never include the API key.
+"""
+Helper functions that call the two public APIs this app uses: openFDA and NIH RxNorm.
+Each one returns plain data with a source link attached, so a Researcher can cite exactly which query a number came from.
 
 openFDA answers "no matches" with HTTP 404, not an empty list. We turn that into an empty result so
 the agent can say "no reports found" instead of "the API failed".

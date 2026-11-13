@@ -1,10 +1,11 @@
-"""Run the README's sample queries three ways and write SAMPLE_RUNS.md:
+"""
+Run the README's sample queries three ways and write SAMPLE_RUNS.md:
 
 1. Expected answer: computed straight from openFDA with plain code, no model involved.
-2. This agent: the deployed /chat, with its full trace of tool calls.
+2. This agent: the app’s /chat, with its full trace of tool calls.
 3. Baseline: the same model with no tools and no system prompt (/baseline).
 
-Usage: uv run sample_runs.py https://your-agent.run.app
+Usage (with uv run app.py running): uv run sample_runs.py http://127.0.0.1:8000
 """
 
 import json
